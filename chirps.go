@@ -77,22 +77,43 @@ func (cfg *apiConfig) handlerPostChirp(w http.ResponseWriter, req *http.Request)
 }
 
 func (cfg *apiConfig) handlerGetChirps(w http.ResponseWriter, req *http.Request) {
-	dbChirps, err := cfg.queries.GetChirps(context.Background())
-	if err != nil {
-		respondWithError(w, 500, "Error getting chirps", err)
+	chirpID := req.PathValue("chirpID")
+	if chirpID == "" {
+		dbChirps, err := cfg.queries.GetChirps(context.Background())
+		if err != nil {
+			respondWithError(w, 500, "Error getting chirps", err)
+			return
+		}
+
+		chirps := []chirp{}
+		for _, dbChirp := range dbChirps {
+			chirps = append(chirps, chirp{
+				ID:        dbChirp.ID,
+				CreatedAt: dbChirp.CreatedAt,
+				UpdatedAt: dbChirp.UpdatedAt,
+				Body:      dbChirp.Body,
+				UserID:    dbChirp.UserID.UUID,
+			})
+		}
+		respondWithJson(w, 200, chirps)
 		return
 	}
 
-	chirps := []chirp{}
-	for _, dbChirp := range dbChirps {
-		chirps = append(chirps, chirp{
-			ID:        dbChirp.ID,
-			CreatedAt: dbChirp.CreatedAt,
-			UpdatedAt: dbChirp.UpdatedAt,
-			Body:      dbChirp.Body,
-			UserID:    dbChirp.UserID.UUID,
-		})
+	chirpUUID, err := uuid.Parse(chirpID)
+	if err != nil {
+		respondWithError(w, 500, "Error parsing chirp uuid", err)
+	}
+	dbChirp, err := cfg.queries.GetChirpByID(context.Background(), chirpUUID)
+	if err != nil {
+		respondWithError(w, 404, "Couldnt find chirp", err)
+		return
 	}
 
-	respondWithJson(w, 200, chirps)
+	respondWithJson(w, 200, chirp{
+		ID:        dbChirp.ID,
+		CreatedAt: dbChirp.CreatedAt,
+		UpdatedAt: dbChirp.UpdatedAt,
+		Body:      dbChirp.Body,
+		UserID:    dbChirp.UserID.UUID,
+	})
 }
